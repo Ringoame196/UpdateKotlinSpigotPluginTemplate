@@ -29,7 +29,7 @@ class SrcGenerator(
                     override fun onEnable() {
                         super.onEnable()
                         server.pluginManager.registerEvents(Events(), plugin)
-                        // val command = getCommand("command")
+						// val command = getCommand("command")
                         // command!!.setExecutor(Command())
                     }
                 }
