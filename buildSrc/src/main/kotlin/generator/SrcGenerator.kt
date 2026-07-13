@@ -14,26 +14,27 @@ class SrcGenerator(
 		makeMain()
 		makeEvent()
 		makeCommand()
+		makeMessage()
 	}
 
 	private fun makeMain() {
 		val main = """
-                package $groupId
+			package $groupId
 
-                import org.bukkit.plugin.java.JavaPlugin
-                import $groupId.commands.Command
-                import $groupId.events.Events
+			import com.github.Ringoame196.events.Events
+			import org.bukkit.plugin.java.JavaPlugin
 
-                class Main : JavaPlugin() {
-                    private val plugin = this
-                    override fun onEnable() {
-                        super.onEnable()
-                        server.pluginManager.registerEvents(Events(), plugin)
-                        // val command = getCommand("command")
-                        // command!!.setExecutor(Command())
-                    }
-                }
-            """.trimIndent()
+			class Main : JavaPlugin() {
+			    private val plugin = this
+			    override fun onEnable() {
+			        super.onEnable()
+			        server.pluginManager.registerEvents(Events(), plugin)
+			        // val command = getCommand("command")
+			        // command!!.setExecutor(Command())
+			    }
+			}
+
+		""".trimIndent()
 		GeneratorUtil.makeFile(srcDir, "Main.kt", main)
 	}
 
@@ -73,5 +74,96 @@ class SrcGenerator(
                 }
             """.trimIndent()
 		GeneratorUtil.makeFile(commandDir, "Command.kt", command)
+	}
+
+	private fun makeMessage() {
+		val messageDir = srcDir.resolve("message").apply(File::mkdirs)
+		val packageName = "$groupId.message"
+
+		val messageManager = """
+			package $packageName
+
+			import org.bukkit.ChatColor
+			import org.bukkit.configuration.file.YamlConfiguration
+			import org.bukkit.plugin.java.JavaPlugin
+			import java.io.File
+			import java.io.InputStreamReader
+
+			class MessageManager(
+			    private val plugin: JavaPlugin
+			) {
+
+			    private val fileName = "messages.yml"
+			    private val file = File(plugin.dataFolder, fileName)
+
+			    private lateinit var messages: YamlConfiguration
+			    private val warnedKeys = mutableSetOf<String>()
+
+			    init {
+			        // 初回のみ resources からコピー
+			        plugin.saveResource(fileName, false)
+			        reload()
+			    }
+
+			    /**
+			     * messages.yml を再読み込みし、
+			     * resources 側で追加されたキーを自動で追記します。
+			     */
+			    fun reload() {
+			        messages = YamlConfiguration.loadConfiguration(file)
+
+			        val defaults = plugin.getResource(fileName)?.use {
+			            YamlConfiguration.loadConfiguration(InputStreamReader(it, Charsets.UTF_8))
+			        } ?: return
+
+			        messages.setDefaults(defaults)
+			        messages.options().copyDefaults(true)
+			        messages.save(file)
+			    }
+
+			    /**
+			     * resources/messages.yml で強制上書きします。
+			     * 開発用。
+			     */
+			    fun overwriteMessages() {
+			        plugin.saveResource(fileName, true)
+			        reload()
+			    }
+
+			    fun contains(path: String): Boolean {
+			        return messages.contains(path)
+			    }
+
+			    fun get(
+			        path: String,
+			        vararg placeholders: Pair<String, String>
+			    ): String {
+
+			        if (!messages.contains(path)) {
+			            if (warnedKeys.add(path)) {
+			                plugin.logger.warning("Message key '${'$'}path' was not found.")
+			            }
+			            return path
+			        }
+
+			        var text = messages.getString(path).orEmpty()
+
+			        placeholders.forEach { (key, value) ->
+			            text = text.replace(key, value)
+			        }
+
+			        return ChatColor.translateAlternateColorCodes('&', text)
+			    }
+			}
+
+		""".trimIndent()
+		GeneratorUtil.makeFile(messageDir, "MessageManager.kt", messageManager)
+
+		val messageKey = """
+			package $packageName
+
+			object MessageKey
+		""".trimIndent()
+		GeneratorUtil.makeFile(messageDir, "MessageKey.kt", messageKey)
 	}
 }
