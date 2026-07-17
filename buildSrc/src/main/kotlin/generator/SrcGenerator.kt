@@ -21,7 +21,7 @@ class SrcGenerator(
 		val main = """
 			package $groupId
 
-			import com.github.Ringoame196.events.Events
+			import $groupId.events.Events
 			import org.bukkit.plugin.java.JavaPlugin
 
 			class Main : JavaPlugin() {
